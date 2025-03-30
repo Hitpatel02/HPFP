@@ -10,9 +10,32 @@
 require('dotenv').config();
 const { execSync } = require('child_process');
 const { Sequelize } = require('sequelize');
+const fs = require('fs');
+const path = require('path');
 
 async function setupDatabase() {
   console.log('Starting database setup...');
+  
+  // Get database credentials from either .env or config.json
+  let dbConfig = {};
+  const configJsonPath = path.join(__dirname, 'config', 'config.json');
+  
+  if (fs.existsSync(configJsonPath)) {
+    console.log('Using config.json for database configuration');
+    const config = require(configJsonPath);
+    const env = process.env.NODE_ENV || 'development';
+    dbConfig = config[env];
+  } else {
+    console.log('Using .env for database configuration');
+    dbConfig = {
+      username: process.env.PGUSER || 'postgres',
+      password: process.env.PGPASSWORD || 'postgres',
+      database: process.env.PGDATABASE || 'HPFP',
+      host: process.env.PGHOST || 'localhost',
+      port: process.env.PGPORT || 5432,
+      dialect: 'postgres'
+    };
+  }
   
   // Create database if it doesn't exist
   try {
@@ -21,17 +44,17 @@ async function setupDatabase() {
     // Connect to PostgreSQL without specifying a database to create the database if needed
     const sequelize = new Sequelize({
       dialect: 'postgres',
-      host: process.env.PGHOST || 'localhost',
-      port: process.env.PGPORT || 5432,
-      username: process.env.PGUSER || 'postgres',
-      password: process.env.PGPASSWORD || 'postgres',
+      host: dbConfig.host,
+      port: dbConfig.port,
+      username: dbConfig.username,
+      password: dbConfig.password,
       logging: false
     });
     
     await sequelize.authenticate();
     console.log('Connected to PostgreSQL successfully.');
     
-    const dbName = process.env.PGDATABASE || 'HPFP';
+    const dbName = dbConfig.database;
     
     // Check if database exists
     const [results] = await sequelize.query(
