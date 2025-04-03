@@ -30,7 +30,7 @@ export default function Header() {
     >
       <Container fluid>
         <Link className="navbar-brand" to="/">
-          HPFP
+          HPRT
         </Link>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
