@@ -365,8 +365,8 @@ const sendWhatsAppReminders = async () => {
                     
                     // For GST, use GST reminder dates (always separate)
                     if (isGstReminderDay && needsGst) {
-                        console.log(`Sending GST 1 reminder to ${client.name}`);
-                        const success = await sendReminderMessage(client, ["GST 1"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
+                        console.log(`Sending GSTR 1 reminder to ${client.name}`);
+                        const success = await sendReminderMessage(client, ["GSTR 1"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
                     
                     if (success) {
                         successCount++;
@@ -400,8 +400,8 @@ const sendWhatsAppReminders = async () => {
                     // Case 1: GST and TDS - Send separate reminders
                     if (client.gst_1_enabled && client.tds_document_enabled) {
                         if (isGstReminderDay && needsGst) {
-                            console.log(`Sending GST 1 reminder to ${client.name}`);
-                            const success = await sendReminderMessage(client, ["GST 1"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
+                            console.log(`Sending GSTR 1 reminder to ${client.name}`);
+                            const success = await sendReminderMessage(client, ["GSTR 1"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
                             
                             if (success) {
                                 successCount++;
@@ -457,7 +457,7 @@ const sendWhatsAppReminders = async () => {
                     else if (client.gst_1_enabled && client.bank_statement_enabled) {
                         if (isGstReminderDay) {
                             const gstBankDocs = [];
-                            if (needsGst) gstBankDocs.push("GST 1");
+                            if (needsGst) gstBankDocs.push("GSTR 1");
                             if (needsBank) gstBankDocs.push("Bank statement");
                             
                             if (gstBankDocs.length > 0) {
@@ -473,7 +473,7 @@ const sendWhatsAppReminders = async () => {
                                             const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
                                                                 (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
                                             
-                                            if (gstBankDocs.includes("GST 1")) {
+                                            if (gstBankDocs.includes("GSTR 1")) {
                                                 await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "gst");
                                             }
                                             if (gstBankDocs.includes("Bank statement")) {
@@ -541,8 +541,8 @@ const sendWhatsAppReminders = async () => {
                     // Only GST applicable
                     if (client.gst_1_enabled && !client.tds_document_enabled && !client.bank_statement_enabled) {
                         if (isGstReminderDay && needsGst) {
-                            console.log(`Sending GST 1 reminder to ${client.name}`);
-                            const success = await sendReminderMessage(client, ["GST 1"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
+                            console.log(`Sending GSTR 1 reminder to ${client.name}`);
+                            const success = await sendReminderMessage(client, ["GSTR 1"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
                             
                             if (success) {
                                 successCount++;
