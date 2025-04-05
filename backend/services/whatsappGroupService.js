@@ -186,7 +186,7 @@ const setupGroupIdMessageHandler = () => {
                 try {
                     await client.sendMessage(
                         groupId,
-                        `Group ID: ${groupId}\n\nYou can use this ID to configure client reminders and notifications.This is a test message.\n\nPLEASE DO NOT REPLY TO THIS MESSAGE.\nPLEASE IGNORE. THANKS 🙏\n\nઆ એક પરીક્ષણ સંદેશ છે.\nકૃપા કરીને આ સંદેશનો જવાબ ન આપો.\nઆભાર 🙏`
+                        `Group ID: ${groupId}\n\nYou can use this ID to configure client reminders and notifications.\n\nThis is a test message.\nPLEASE DO NOT REPLY TO THIS MESSAGE.\nPLEASE IGNORE. THANKS 🙏\n\nઆ એક પરીક્ષણ સંદેશ છે.\nકૃપા કરીને આ સંદેશનો જવાબ ન આપો.\nઆભાર 🙏`
                     );
                     
                     // Log this retrieval
