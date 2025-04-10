@@ -2,7 +2,6 @@ const axios = require('axios');
 const { DateTime } = require('luxon');
 const db = require('../config/db');
 const { getToken } = require('../config/msGraph');
-const logsQueries = require('../queries/logsQueries');
 const loggingService = require('./loggingService');
 const clientDocumentsQueries = require('../queries/clientDocumentsQueries');
 
@@ -132,9 +131,9 @@ const sendEmailReminders = async () => {
         // Determine which documents to group together based on the scenarios
         
         // Scenario 1: All 3 documents applicable
-        if (client.gst_1_enabled && client.tds_document_enabled && client.bank_statement_enabled) {
+        if (needsGst && needsBank && needsTds) {
           // For TDS and Bank Statement, use TDS reminder dates
-          if (isTdsReminderDay && (needsTds || needsBank)) {
+          if (isTdsReminderDay) {
             const tdsBankDocs = [];
             if (needsTds) tdsBankDocs.push("TDS data");
             if (needsBank) tdsBankDocs.push("Bank statement");
@@ -164,14 +163,14 @@ const sendEmailReminders = async () => {
           }
           
           // For GST, use GST reminder dates
-          if (isGstReminderDay && needsGst) {
-            console.log(`Sending GSTR 1 reminder email to ${client.name}`);
+          if (isGstReminderDay) {
+            console.log(`Sending GSTR 1 data reminder email to ${client.name}`);
           await sendDocumentEmail(
             graphClient,
             senderEmail,
             client,
             recipients,
-              ["GSTR 1"],
+            ["GSTR 1 data"],
             gstReminderNumber,
             settings.gst_due_date
           );
@@ -184,20 +183,20 @@ const sendEmailReminders = async () => {
         }
         // Scenario 2: 2 documents applicable
         else if (
-          (client.gst_1_enabled && client.tds_document_enabled && !client.bank_statement_enabled) ||
-          (client.gst_1_enabled && !client.tds_document_enabled && client.bank_statement_enabled) ||
-          (!client.gst_1_enabled && client.tds_document_enabled && client.bank_statement_enabled)
+          (needsGst && needsTds && !needsBank) ||
+          (needsGst && !needsTds && needsBank) ||
+          (!needsGst && needsTds && needsBank)
         ) {
           // Case 1: GST and TDS - Send separate reminders
-          if (client.gst_1_enabled && client.tds_document_enabled) {
-            if (isGstReminderDay && needsGst) {
-              console.log(`Sending GSTR 1 reminder email to ${client.name}`);
+          if (needsGst && needsTds) {
+            if (isGstReminderDay) {
+              console.log(`Sending GSTR 1 data reminder email to ${client.name}`);
           await sendDocumentEmail(
             graphClient,
             senderEmail,
             client,
             recipients,
-                ["GSTR 1"],
+                ["GSTR 1 data"],
             gstReminderNumber,
             settings.gst_due_date
           );
@@ -208,7 +207,7 @@ const sendEmailReminders = async () => {
               }
             }
             
-            if (isTdsReminderDay && needsTds) {
+            if (isTdsReminderDay) {
               console.log(`Sending TDS data reminder email to ${client.name}`);
               await sendDocumentEmail(
                 graphClient,
@@ -227,10 +226,10 @@ const sendEmailReminders = async () => {
             }
           }
           // Case 2: GST and Bank Statement - Group together with GST dates
-          else if (client.gst_1_enabled && client.bank_statement_enabled) {
+          else if (needsGst && needsBank) {
             if (isGstReminderDay) {
               const gstBankDocs = [];
-              if (needsGst) gstBankDocs.push("GSTR 1");
+              if (needsGst) gstBankDocs.push("GSTR 1 data");
               if (needsBank) gstBankDocs.push("Bank statement");
               
               if (gstBankDocs.length > 0) {
@@ -247,7 +246,7 @@ const sendEmailReminders = async () => {
                 
                 // Update reminder status for each document type
                 if (gstReminderNumber > 0) {
-                  if (gstBankDocs.includes("GSTR 1")) {
+                  if (gstBankDocs.includes("GSTR 1 data")) {
                     await updateReminderStatus(client.id, client.document_month, gstReminderNumber, "gst");
                   }
                   if (gstBankDocs.includes("Bank statement")) {
@@ -258,7 +257,7 @@ const sendEmailReminders = async () => {
             }
           }
           // Case 3: TDS and Bank Statement - Group together with TDS dates
-          else if (client.tds_document_enabled && client.bank_statement_enabled) {
+          else if (needsTds && needsBank) {
             if (isTdsReminderDay) {
         const tdsBankDocs = [];
               if (needsTds) tdsBankDocs.push("TDS data");
@@ -292,15 +291,15 @@ const sendEmailReminders = async () => {
         // Scenario 3: Only 1 document applicable
         else {
           // Only GST applicable
-          if (client.gst_1_enabled && !client.tds_document_enabled && !client.bank_statement_enabled) {
+          if (needsGst && !needsBank && !needsTds) {
             if (isGstReminderDay && needsGst) {
-              console.log(`Sending GSTR 1 reminder email to ${client.name}`);
+              console.log(`Sending GSTR 1 data reminder email to ${client.name}`);
               await sendDocumentEmail(
                 graphClient,
                 senderEmail,
                 client,
                 recipients,
-                ["GSTR 1"],
+                ["GSTR 1 data"],
                 gstReminderNumber,
                 settings.gst_due_date
               );
@@ -312,8 +311,8 @@ const sendEmailReminders = async () => {
             }
           }
           // Only TDS applicable
-          else if (!client.gst_1_enabled && client.tds_document_enabled && !client.bank_statement_enabled) {
-            if (isTdsReminderDay && needsTds) {
+          else if (!needsGst && needsTds && !needsBank) {
+            if (isTdsReminderDay) {
               console.log(`Sending TDS data reminder email to ${client.name}`);
               await sendDocumentEmail(
                 graphClient,
@@ -332,8 +331,8 @@ const sendEmailReminders = async () => {
             }
           }
           // Only Bank Statement applicable
-          else if (!client.gst_1_enabled && !client.tds_document_enabled && client.bank_statement_enabled) {
-            if (isGstReminderDay && needsBank) {
+          else if (!needsGst && !needsTds && needsBank) {
+            if (isGstReminderDay) {
               console.log(`Sending Bank statement reminder email to ${client.name}`);
               await sendDocumentEmail(
                 graphClient,

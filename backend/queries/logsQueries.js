@@ -116,18 +116,17 @@ async function createWhatsAppLog(logData) {
   const {
     client_id,
     group_id, 
-    message_type, 
-    message_content, 
+    message, 
     status, 
     error_message
   } = logData;
   
   const result = await db.query(`
     INSERT INTO "user".whatsapp_logs 
-      (client_id, group_id, message_type, message_content, status, error_message, sent_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      (client_id, group_id, message, status, error_message, sent_at)
+    VALUES ($1, $2, $3, $4, $5, NOW())
     RETURNING *
-  `, [client_id || null, group_id, message_type, message_content, status, error_message]);
+  `, [client_id || null, group_id, message, status, error_message]);
   
   return result.rows[0];
 }
@@ -143,17 +142,29 @@ async function createEmailLog(logData) {
     to_email,
     cc_emails,
     subject,
+    body,
     template_used,
     status,
-    error_message
+    error_message,
+    document_month,
+    reminder_number
   } = logData;
   
   const result = await db.query(`
     INSERT INTO "user".email_logs 
-      (client_id, to_email, cc_emails, subject, template_used, status, error_message, sent_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      (client_id, email_to, email_subject, email_body, sent_at, status, error_message, document_month, reminder_number)
+    VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8)
     RETURNING *
-  `, [client_id || null, to_email, cc_emails, subject, template_used, status, error_message]);
+  `, [
+    client_id || null, 
+    to_email, 
+    subject, 
+    body || null, 
+    status, 
+    error_message || null, 
+    document_month || null, 
+    reminder_number || null
+  ]);
   
   return result.rows[0];
 }

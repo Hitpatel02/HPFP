@@ -8,7 +8,15 @@ const {
     deleteDocument,
     createDocumentsForAll,
     createDocumentForClient,
+    getAllDocuments
 } = require('../controllers/documentController');
+
+/**
+ * @route   GET /api/documents
+ * @desc    Get all document records
+ * @access  Private
+ */
+router.get('/', authenticateToken, getAllDocuments);
 
 /**
  * @route   GET /api/documents/month/:month

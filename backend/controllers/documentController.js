@@ -1,6 +1,7 @@
 const documentService = require('../services/documentService');
 const documentQueries = require('../queries/documentQueries');
 const { getFormattedMonth } = require('../utils/dateUtils');
+const db = require('../config/db');
 
 /**
  * @desc    Get all document records for a specific month
@@ -183,6 +184,26 @@ exports.createDocumentForClient = async (req, res) => {
         });
     } catch (error) {
         console.error(`Error creating document for client ${req.params.clientId}:`, error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+/**
+ * @desc    Get all document records
+ */
+exports.getAllDocuments = async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT cd.*, c.name as client_name, c.email_id_1, c.gst_filing_type,
+                   c.gst_1_enabled, c.bank_statement_enabled, c.tds_document_enabled
+             FROM "user".client_documents cd
+             JOIN "user".clients c ON cd.client_id = c.id
+             ORDER BY cd.document_month DESC, c.name`
+        );
+        
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching all documents:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }; 

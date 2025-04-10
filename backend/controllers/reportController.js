@@ -83,14 +83,14 @@ exports.getClientsPendingDocuments = async (req, res) => {
 exports.downloadReport = (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        let fileName = 'HPFP_Report';
+        let fileName = 'HPRT_Report';
         
         if (startDate && endDate) {
-            fileName = `HPFP_Report_${startDate}_to_${endDate}`;
+            fileName = `HPRT_Report_${startDate}_to_${endDate}`;
         } else if (startDate) {
-            fileName = `HPFP_Report_from_${startDate}`;
+            fileName = `HPRT_Report_from_${startDate}`;
         } else if (endDate) {
-            fileName = `HPFP_Report_to_${endDate}`;
+            fileName = `HPRT_Report_to_${endDate}`;
         }
         
         const filePath = path.join(process.cwd(), 'reports', 'monthly_report.pdf');
@@ -114,15 +114,15 @@ exports.downloadReport = (req, res) => {
 exports.downloadReportCSV = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        let fileName = 'HPFP_Monthly_Report';
+        let fileName = 'HPRT_Monthly_Report';
         
         if (startDate && endDate) {
             // Format dates for filename in YYYY-MM-DD format
-            fileName = `HPFP_Monthly_Report_${startDate}_to_${endDate}`;
+            fileName = `HPRT_Monthly_Report_${startDate}_to_${endDate}`;
         } else if (startDate) {
-            fileName = `HPFP_Monthly_Report_from_${startDate}`;
+            fileName = `HPRT_Monthly_Report_from_${startDate}`;
         } else if (endDate) {
-            fileName = `HPFP_Monthly_Report_to_${endDate}`;
+            fileName = `HPRT_Monthly_Report_to_${endDate}`;
         }
         
         // Get the report data
@@ -216,7 +216,7 @@ exports.downloadReportCSV = async (req, res) => {
         }).join('\n');
         
         // Create the complete CSV content with separator hint for Excel
-        const csvContent = `sep=,\nHPFP Monthly Report (${startDate || ''} to ${endDate || ''})\nGenerated on: ${formatDateToDDMMYYYY(new Date())}\n\n${csvHeader}${csvRows}`;
+        const csvContent = `sep=,\nHPRT Monthly Report (${startDate || ''} to ${endDate || ''})\nGenerated on: ${formatDateToDDMMYYYY(new Date())}\n\n${csvHeader}${csvRows}`;
         
         // Set headers for CSV download
         res.setHeader('Content-Type', 'text/csv');
