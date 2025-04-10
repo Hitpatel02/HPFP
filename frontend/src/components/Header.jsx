@@ -29,9 +29,9 @@ export default function Header() {
       className="navbar py-1"
     >
       <Container fluid>
-        <Link className="navbar-brand" to="/">
+        <Navbar.Brand>
           HPRT
-        </Link>
+        </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
           {token && (
@@ -39,6 +39,7 @@ export default function Header() {
               <Link className={`nav-link ${isActive('/')}`} to="/">Dashboard</Link>
               <Link className={`nav-link ${isActive('/clients')}`} to="/clients">Clients</Link>
               <Link className={`nav-link ${isActive('/status')}`} to="/status">Document Status</Link>
+              <Link className={`nav-link ${isActive('/submission')}`} to="/submission">Submission</Link>
               <Link className={`nav-link ${isActive('/settings')}`} to="/settings">Reminder Settings</Link>
               <Link className={`nav-link ${isActive('/logs')}`} to="/logs">Communication Logs</Link>
               <Link className={`nav-link ${isActive('/reports')}`} to="/reports">Reports</Link>

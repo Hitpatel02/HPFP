@@ -13,6 +13,7 @@ import ClientDocuments from './components/ClientDocuments';
 import ClientEdit from './components/ClientEdit';
 import ReminderSettings from './components/ReminderSettings';
 import DocumentStatus from './components/DocumentStatus';
+import SubmissionPage from './components/SubmissionPage';
 import UserManagement from './pages/UserManagement';
 import CommunicationLogs from './components/CommunicationLogs';
 import { 
@@ -117,6 +118,7 @@ function AppRoutes() {
       <Route path="/" element={token ? <Dashboard /> : <Navigate to="/login" />} />
       <Route path="/reports" element={token ? <ReportPage /> : <Navigate to="/login" />} />
       <Route path="/status" element={token ? <DocumentStatus /> : <Navigate to="/login" />} />
+      <Route path="/submission" element={token ? <SubmissionPage /> : <Navigate to="/login" />} />
       
       {/* Client management routes */}
       <Route path="/clients" element={token ? <ClientList /> : <Navigate to="/login" />} />

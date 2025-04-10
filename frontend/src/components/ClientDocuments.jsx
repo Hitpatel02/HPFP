@@ -336,32 +336,85 @@ const ClientDocuments = () => {
       <Card className="mb-4">
         <Card.Body>
           <Card.Title>{client.name}</Card.Title>
-          <Card.Subtitle className="mb-2 text-muted">
+          <Card.Subtitle className="mb-3 text-muted">
             GST Filing Type: {client.gst_filing_type}
           </Card.Subtitle>
-          <Card.Text>
-            <strong>Email Addresses:</strong><br />
-            {client.email_id_1 && <div>{client.email_id_1}</div>}
-            {client.email_id_2 && <div>{client.email_id_2}</div>}
-            {client.email_id_3 && <div>{client.email_id_3}</div>}
-            <br />
-            {(client.gst_number || client.phone_number) && (
-              <>
-                <strong>Contact Information:</strong><br />
-                {client.gst_number && <div>GST Number: {client.gst_number}</div>}
-                {client.phone_number && <div>Phone Number: {client.phone_number}</div>}
-                <br />
-              </>
-            )}
-            <strong>Document Types:</strong><br />
-            <ul className="mb-2">
-              {client.gst_1_enabled && <li>GST 1</li>}
-              {client.bank_statement_enabled && <li>Bank Statement</li>}
-              {client.tds_document_enabled && <li>TDS</li>}
-            </ul>
-            <strong>WhatsApp Group:</strong><br />
-            {client.whatsapp_group_id || 'Not set'}
-          </Card.Text>
+          
+          <Table bordered size="sm" className="client-details-table">
+            <tbody>
+              <tr>
+                <th className="bg-light">Email Addresses</th>
+                {client.email_id_1 && client.email_id_2 && client.email_id_3 ? (
+                  <>
+                    <td>{client.email_id_1}</td>
+                    <td>{client.email_id_2}</td>
+                    <td>{client.email_id_3}</td>
+                  </>
+                ) : client.email_id_1 && client.email_id_2 ? (
+                  <>
+                    <td>{client.email_id_1}</td>
+                    <td colSpan="2">{client.email_id_2}</td>
+                  </>
+                ) : client.email_id_1 ? (
+                  <td colSpan="3">{client.email_id_1}</td>
+                ) : (
+                  <td colSpan="3">No email addresses</td>
+                )}
+              </tr>
+              {(client.gst_number || client.phone_number) && (
+                <tr>
+                  <th className="bg-light">Contact Information</th>
+                  {client.gst_number && client.phone_number ? (
+                    <>
+                      <td>GST Number: {client.gst_number}</td>
+                      <td colSpan="2">Phone Number: {client.phone_number}</td>
+                    </>
+                  ) : client.gst_number ? (
+                    <td colSpan="3">GST Number: {client.gst_number}</td>
+                  ) : (
+                    <td colSpan="3">Phone Number: {client.phone_number}</td>
+                  )}
+                </tr>
+              )}
+              <tr>
+                <th className="bg-light">Document Types</th>
+                {client.gst_1_enabled && client.bank_statement_enabled && client.tds_document_enabled ? (
+                  <>
+                    <td className="text-center">GST 1</td>
+                    <td className="text-center">Bank Statement</td>
+                    <td className="text-center">TDS</td>
+                  </>
+                ) : client.gst_1_enabled && client.bank_statement_enabled ? (
+                  <>
+                    <td className="text-center">GST 1</td>
+                    <td colSpan="2" className="text-center">Bank Statement</td>
+                  </>
+                ) : client.gst_1_enabled && client.tds_document_enabled ? (
+                  <>
+                    <td className="text-center">GST 1</td>
+                    <td colSpan="2" className="text-center">TDS</td>
+                  </>
+                ) : client.bank_statement_enabled && client.tds_document_enabled ? (
+                  <>
+                    <td className="text-center">Bank Statement</td>
+                    <td colSpan="2" className="text-center">TDS</td>
+                  </>
+                ) : client.gst_1_enabled ? (
+                  <td colSpan="3" className="text-center">GST 1</td>
+                ) : client.bank_statement_enabled ? (
+                  <td colSpan="3" className="text-center">Bank Statement</td>
+                ) : client.tds_document_enabled ? (
+                  <td colSpan="3" className="text-center">TDS</td>
+                ) : (
+                  <td colSpan="3">No document types enabled</td>
+                )}
+              </tr>
+              <tr>
+                <th className="bg-light">WhatsApp Group</th>
+                <td colSpan="3">{client.whatsapp_group_id || 'Not set'}</td>
+              </tr>
+            </tbody>
+          </Table>
         </Card.Body>
       </Card>
       

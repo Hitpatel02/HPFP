@@ -95,6 +95,11 @@ const DateInput = ({
       }
     };
     onChange(modifiedEvent);
+    
+    // Close the calendar after date selection
+    if (datePickerRef.current) {
+      datePickerRef.current.setOpen(false);
+    }
   };
   
   // Handle calendar icon click

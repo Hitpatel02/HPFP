@@ -52,7 +52,7 @@ const Login = () => {
     <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 80px)', paddingTop: '80px' }}>
       <Card style={{ width: '400px', marginTop: '20px' }}>
         <Card.Body>
-          <Card.Title className="text-center mb-4">Login to HPFP</Card.Title>
+          <Card.Title className="text-center mb-4">Login to HPRT</Card.Title>
           
           {error && <Alert variant="danger">{error}</Alert>}
           

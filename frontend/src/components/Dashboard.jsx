@@ -145,7 +145,7 @@ export default function Dashboard() {
           <Card>
             <Card.Header>System Information</Card.Header>
             <Card.Body>
-              <p>Welcome to the HPFP Management System.</p>
+              <p>Welcome to the HPRT Management System.</p>
               <p>This system helps you track GST document submissions and send automated reminders to clients.</p>
               <p>Use the navigation menu to access different features of the system.</p>
             </Card.Body>

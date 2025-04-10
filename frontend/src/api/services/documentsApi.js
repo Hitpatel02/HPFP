@@ -6,6 +6,12 @@ import apiRequest, { getAuthHeaders } from './apiUtils';
 
 // Documents API
 const documentsAPI = {
+  getAll: async (token) => {
+    return apiRequest('/api/documents', {
+      headers: getAuthHeaders(token)
+    });
+  },
+
   getPending: async (token) => {
     return apiRequest('/api/pending-documents', {
       headers: getAuthHeaders(token)

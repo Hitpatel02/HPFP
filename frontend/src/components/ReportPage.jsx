@@ -131,7 +131,7 @@ const ReportPage = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'HPFP_Monthly_Report.pdf';
+      a.download = `HPRT_Monthly_Report_${dateRange.startDate || 'all'}_to_${dateRange.endDate || 'all'}.pdf`;
       document.body.appendChild(a);
       a.click();
       
@@ -169,7 +169,7 @@ const ReportPage = () => {
       const a = document.createElement('a');
       a.setAttribute('hidden', '');
       a.setAttribute('href', url);
-      a.setAttribute('download', `HPFP_Monthly_Report_${dateRange.startDate || 'all'}_to_${dateRange.endDate || 'all'}.csv`);
+      a.setAttribute('download', `HPRT_Monthly_Report_${dateRange.startDate || 'all'}_to_${dateRange.endDate || 'all'}.csv`);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

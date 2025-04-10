@@ -126,6 +126,9 @@ const CommunicationDateInput = ({
       preventDefault: () => {} // Prevent form submission
     };
     onChange(modifiedEvent);
+    
+    // Close the calendar after date selection
+    setOpenDatePickerId(null);
   };
   
   // Handle Clear button click - separate handler to ensure it just clears
