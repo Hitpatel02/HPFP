@@ -37,9 +37,9 @@ export default function Header() {
           {token && (
             <Nav className="me-auto">
               <Link className={`nav-link ${isActive('/')}`} to="/">Dashboard</Link>
-              <Link className={`nav-link ${isActive('/clients')}`} to="/clients">Clients</Link>
-              <Link className={`nav-link ${isActive('/status')}`} to="/status">Document Status</Link>
-              <Link className={`nav-link ${isActive('/submission')}`} to="/submission">Submission</Link>
+              <Link className={`nav-link ${isActive('/clients')}`} to="/clients">Client Master</Link>
+              <Link className={`nav-link ${isActive('/status')}`} to="/status">Document Pending Status</Link>
+              <Link className={`nav-link ${isActive('/submission')}`} to="/submission">Data Received Status</Link>
               <Link className={`nav-link ${isActive('/settings')}`} to="/settings">Reminder Settings</Link>
               <Link className={`nav-link ${isActive('/logs')}`} to="/logs">Communication Logs</Link>
               <Link className={`nav-link ${isActive('/reports')}`} to="/reports">Reports</Link>

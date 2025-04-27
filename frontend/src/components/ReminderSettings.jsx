@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Card, Form, Button, Alert, Spinner, Table, Row, Col, InputGroup } from 'react-bootstrap';
-import { format, sub, parse } from 'date-fns';
+import { Card, Form, Button, Alert, Spinner, Row, Col } from 'react-bootstrap';
+import { format, parse } from 'date-fns';
 import { formatDateForDisplay, getTodayDate } from '../utils/dateUtils';
 import CommunicationDateInput, { DatePickerProvider } from './common/CommunicationDateInput';
 import SetReminderDates from './SetReminderDates';
@@ -10,6 +10,7 @@ import ReminderToggles from './ReminderToggles';
 import { selectToken, setInitialDataLoaded } from '../redux/authSlice';
 import LoadingSpinner from './common/LoadingSpinner';
 import { settingsAPI } from '../api';
+import axios from 'axios';
 
 const ReminderSettings = () => {
   const token = useSelector(selectToken);
@@ -28,6 +29,10 @@ const ReminderSettings = () => {
   // State to track available months with settings
   const [availableMonths, setAvailableMonths] = useState([]);
   
+  // State to track which type of reminder to show in samples
+  const [gstReminderType, setGstReminderType] = useState(1); // 1 for first, 2 for second
+  const [tdsReminderType, setTdsReminderType] = useState(1); // 1 for first, 2 for second
+  
   const [formData, setFormData] = useState({
     today_date: '',
     gst_due_date: '',
@@ -37,8 +42,9 @@ const ReminderSettings = () => {
     tds_reminder_1_date: '',
     tds_reminder_2_date: '',
     password: '',
-    scheduler_hour: 9,
-    scheduler_minute: '00',
+    scheduler_hour: 10,
+    scheduler_minute: '30',
+    scheduler_minute_value: 30,
     scheduler_am_pm: 'AM'
   });
 
@@ -81,6 +87,43 @@ const ReminderSettings = () => {
       ...prev,
       today_date: getTodayDate() // Use the getTodayDate function to ensure consistent timezone handling
     }));
+  };
+  
+  // Function to generate default dates based on selected month and year
+  const generateDefaultDates = () => {
+    // Create dates for the selected month/year
+    const gstDueDate = new Date(selectedYear, selectedMonth, 10);
+    const tdsDueDate = new Date(selectedYear, selectedMonth, 8);
+    
+    // Create reminder dates
+    let gstReminder1Date = new Date(selectedYear, selectedMonth, 5);
+    let gstReminder2Date = new Date(selectedYear, selectedMonth, 8);
+    let tdsReminder1Date = new Date(selectedYear, selectedMonth, 1);
+    let tdsReminder2Date = new Date(selectedYear, selectedMonth, 4);
+    
+    // Check if any reminder dates fall on Sunday (day 0) and adjust
+    if (gstReminder1Date.getDay() === 0) gstReminder1Date.setDate(gstReminder1Date.getDate() + 1);
+    if (gstReminder2Date.getDay() === 0) gstReminder2Date.setDate(gstReminder2Date.getDate() + 1);
+    if (tdsReminder1Date.getDay() === 0) tdsReminder1Date.setDate(tdsReminder1Date.getDate() + 1);
+    if (tdsReminder2Date.getDay() === 0) tdsReminder2Date.setDate(tdsReminder2Date.getDate() + 1);
+    
+    // Format dates to YYYY-MM-DD
+    const formatDate = (date) => {
+      return format(date, 'yyyy-MM-dd');
+    };
+    
+    return {
+      gst_due_date: formatDate(gstDueDate),
+      tds_due_date: formatDate(tdsDueDate),
+      gst_reminder_1_date: formatDate(gstReminder1Date),
+      gst_reminder_2_date: formatDate(gstReminder2Date),
+      tds_reminder_1_date: formatDate(tdsReminder1Date),
+      tds_reminder_2_date: formatDate(tdsReminder2Date),
+      scheduler_hour: 10,
+      scheduler_minute: '30',
+      scheduler_minute_value: 30,
+      scheduler_am_pm: 'AM'
+    };
   };
   
   // Helper function to format dates for the API
@@ -148,8 +191,40 @@ const ReminderSettings = () => {
       
       const response = await settingsAPI.getSettingsForMonth(token, yearStr, monthStr);
       
-      // Format dates and set default values
-      if (response && Object.keys(response).length > 0) {
+      // Check if the response contains valid settings for the current month
+      const selectedMonthName = months[selectedMonth];
+      const selectedYearStr = selectedYear.toString();
+      
+      // Verify the settings are for the correct month/year - strict validation
+      const responseHasValidSettings = response && 
+                                       Object.keys(response).length > 0 && 
+                                       response.current_month && 
+                                       response.current_month.toLowerCase().includes(selectedMonthName.toLowerCase()) &&
+                                       response.current_month.includes(selectedYearStr) &&
+                                       // Add strict verification that this is an actual record for this specific month
+                                       response.id && 
+                                       // Check if the month in current_month matches the selected month exactly
+                                       (response.current_month === `${selectedMonthName} ${selectedYearStr}` ||
+                                        response.current_month === `${selectedMonthName.toLowerCase()} ${selectedYearStr}` ||
+                                        response.current_month === `${selectedMonthName.toUpperCase()} ${selectedYearStr}`);
+      
+      console.log('Validating response for', `${selectedMonthName} ${selectedYearStr}`);
+      console.log('Response has valid settings:', responseHasValidSettings);
+      
+      if (response) {
+        console.log('Response data:', {
+          current_month: response.current_month,
+          id: response.id,
+          scheduler_settings: {
+            hour: response.scheduler_hour,
+            minute: response.scheduler_minute,
+            ampm: response.scheduler_am_pm
+          }
+        });
+      }
+      
+      if (responseHasValidSettings) {
+        console.log(`Found valid settings for ${selectedMonthName} ${selectedYearStr}`);
         const formattedSettings = { ...response };
         const dateFields = [
           'gst_due_date', 'gst_reminder_1_date', 
@@ -168,57 +243,117 @@ const ReminderSettings = () => {
           }
         });
         
-        // Ensure scheduler fields have default values if they're not present or null
-        formattedSettings.scheduler_hour = formattedSettings.scheduler_hour !== null ? 
-          parseInt(formattedSettings.scheduler_hour, 10) : 9;
+        // Only process scheduler settings if we have confirmed this is the correct month/year record
+        console.log('Original scheduler settings from server:', {
+          hour: formattedSettings.scheduler_hour,
+          minute: formattedSettings.scheduler_minute,
+          ampm: formattedSettings.scheduler_am_pm
+        });
         
-        // Parse minute value for internal state storage
-        const minuteValue = formattedSettings.scheduler_minute !== null ? 
-          parseInt(formattedSettings.scheduler_minute, 10) : 0;
+        // Process scheduler settings from DB - keep original values if they exist
+        // Only validate and process if there are valid values
+        if (formattedSettings.scheduler_hour !== null && formattedSettings.scheduler_hour !== undefined) {
+          // Parse the hour value
+          formattedSettings.scheduler_hour = parseInt(formattedSettings.scheduler_hour, 10);
+          if (isNaN(formattedSettings.scheduler_hour) || formattedSettings.scheduler_hour < 1 || formattedSettings.scheduler_hour > 12) {
+            formattedSettings.scheduler_hour = 10; // Default if invalid
+          }
+        } else {
+          formattedSettings.scheduler_hour = 10; // Default if not present
+        }
         
-        // Store the raw numeric value
-        formattedSettings.scheduler_minute_value = minuteValue;
+        // Process minute value
+        if (formattedSettings.scheduler_minute !== null && formattedSettings.scheduler_minute !== undefined) {
+          // Parse the minute to ensure it's a valid number
+          const parsedMinute = parseInt(formattedSettings.scheduler_minute, 10);
+          if (!isNaN(parsedMinute) && parsedMinute >= 0 && parsedMinute <= 59) {
+            formattedSettings.scheduler_minute_value = parsedMinute;
+            formattedSettings.scheduler_minute = parsedMinute.toString().padStart(2, '0');
+          } else {
+            formattedSettings.scheduler_minute_value = 30;
+            formattedSettings.scheduler_minute = '30';
+          }
+        } else {
+          formattedSettings.scheduler_minute_value = 30;
+          formattedSettings.scheduler_minute = '30';
+        }
         
-        // Format minute for display with leading zero if needed
-        formattedSettings.scheduler_minute = minuteValue.toString().padStart(2, '0');
+        // Default to AM if no valid value is present
+        formattedSettings.scheduler_am_pm = 
+          (formattedSettings.scheduler_am_pm === 'PM' || formattedSettings.scheduler_am_pm === 'AM') ? 
+          formattedSettings.scheduler_am_pm : 'AM';
         
-        formattedSettings.scheduler_am_pm = formattedSettings.scheduler_am_pm || 'AM';
+        console.log('Processed scheduler settings:', {
+          hour: formattedSettings.scheduler_hour,
+          minute: formattedSettings.scheduler_minute,
+          ampm: formattedSettings.scheduler_am_pm
+        });
         
         // Ensure password field is a string
         formattedSettings.password = formattedSettings.password || '';
         
         console.log('Formatted settings:', formattedSettings);
         
-        // Set default values for missing fields
-        formattedSettings.gst_due_date = formattedSettings.gst_due_date || '';
-        formattedSettings.gst_reminder_1_date = formattedSettings.gst_reminder_1_date || '';
-        formattedSettings.gst_reminder_2_date = formattedSettings.gst_reminder_2_date || '';
-        formattedSettings.tds_due_date = formattedSettings.tds_due_date || '';
-        formattedSettings.tds_reminder_1_date = formattedSettings.tds_reminder_1_date || '';
-        formattedSettings.tds_reminder_2_date = formattedSettings.tds_reminder_2_date || '';
+        // Set default values for missing fields using our generateDefaultDates function
+        const defaultDates = generateDefaultDates();
+        formattedSettings.gst_due_date = formattedSettings.gst_due_date || defaultDates.gst_due_date;
+        formattedSettings.gst_reminder_1_date = formattedSettings.gst_reminder_1_date || defaultDates.gst_reminder_1_date;
+        formattedSettings.gst_reminder_2_date = formattedSettings.gst_reminder_2_date || defaultDates.gst_reminder_2_date;
+        formattedSettings.tds_due_date = formattedSettings.tds_due_date || defaultDates.tds_due_date;
+        formattedSettings.tds_reminder_1_date = formattedSettings.tds_reminder_1_date || defaultDates.tds_reminder_1_date;
+        formattedSettings.tds_reminder_2_date = formattedSettings.tds_reminder_2_date || defaultDates.tds_reminder_2_date;
         
         // Set the formatted settings to the form data state
         setFormData(formattedSettings);
         setSettings(formattedSettings);
       } else {
-        // No settings found for this month, set empty form
-        const months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                    'July', 'August', 'September', 'October', 'November', 'December'];
-        // Reset form data but keep the selected month/year
-        setFormData({
+        // No valid settings found for this month, set default form with our generated default dates
+        console.log(`No valid settings found for ${months[selectedMonth]} ${selectedYear}. Using default values.`);
+        
+        // Log detailed diagnostic information about the response
+        if (response && response.current_month) {
+          console.log(`VALIDATION FAILED: Received settings for "${response.current_month}" but expecting "${months[selectedMonth]} ${selectedYear}"`);
+          console.warn(`REJECTING invalid scheduler settings from server:`, {
+            hour: response.scheduler_hour,
+            minute: response.scheduler_minute,
+            ampm: response.scheduler_am_pm,
+            id: response.id || 'No ID found',
+            validation_failure: response.current_month !== `${months[selectedMonth]} ${selectedYear}` ? 
+                               'Month name mismatch' : 'Other validation failure'
+          });
+        } else if (response) {
+          console.log(`Response received but missing current_month property:`, response);
+        } else {
+          console.log(`No settings object received from API`);
+        }
+        
+        // Get default dates for the selected month/year
+        const defaultDates = generateDefaultDates();
+        console.log("Applying default scheduler settings:", {
+          hour: 10,
+          minute: '30', 
+          ampm: 'AM'
+        });
+        
+        // Reset form data but keep the selected month/year and use default dates
+        const newFormData = {
           today_date: format(new Date(), 'yyyy-MM-dd'),
-          gst_due_date: '',
-          gst_reminder_1_date: '',
-          gst_reminder_2_date: '',
-          tds_due_date: '',
-          tds_reminder_1_date: '',
-          tds_reminder_2_date: '',
+          gst_due_date: defaultDates.gst_due_date,
+          gst_reminder_1_date: defaultDates.gst_reminder_1_date,
+          gst_reminder_2_date: defaultDates.gst_reminder_2_date,
+          tds_due_date: defaultDates.tds_due_date,
+          tds_reminder_1_date: defaultDates.tds_reminder_1_date,
+          tds_reminder_2_date: defaultDates.tds_reminder_2_date,
           password: '',
-          scheduler_hour: 9,
-          scheduler_minute: '00',
+          scheduler_hour: 10,
+          scheduler_minute: '30',
+          scheduler_minute_value: 30,
           scheduler_am_pm: 'AM',
           current_month: `${months[selectedMonth]} ${selectedYear}`
-        });
+        };
+        
+        console.log("New form data with defaults:", newFormData);
+        setFormData(newFormData);
         setSettings(null);
       }
       
@@ -259,7 +394,7 @@ const ReminderSettings = () => {
         if (!isNaN(numValue) && numValue >= 1 && numValue <= 12) {
           setFormData(prev => ({
             ...prev,
-            scheduler_hour: value
+            scheduler_hour: numValue // Store as number, not string
           }));
         }
       }
@@ -299,7 +434,7 @@ const ReminderSettings = () => {
     if (value === '') {
       setFormData(prev => ({
         ...prev,
-        scheduler_hour: '9' // Default value
+        scheduler_hour: 10 // Default value 10
       }));
     }
   };
@@ -420,12 +555,18 @@ const ReminderSettings = () => {
         throw new Error('Scheduler minute must be between 0 and 59');
       }
       
-      // Use the stored numeric value for minutes
+      // Use the stored minute value
       formDataToSubmit.scheduler_minute = minuteValue;
       
       // Ensure scheduler_am_pm is either 'AM' or 'PM'
       formDataToSubmit.scheduler_am_pm = 
         (formDataToSubmit.scheduler_am_pm === 'PM' ? 'PM' : 'AM');
+      
+      console.log('Scheduler settings being saved:', {
+        hour: formDataToSubmit.scheduler_hour,
+        minute: formDataToSubmit.scheduler_minute,
+        ampm: formDataToSubmit.scheduler_am_pm
+      });
       
       // Add current month based on month and year selection
       formDataToSubmit.current_month = `${months[selectedMonth]} ${selectedYear}`;
@@ -468,6 +609,13 @@ const ReminderSettings = () => {
   useEffect(() => {
     console.log('Updated form data:', formData);
   }, [formData]);
+
+  // Update default dates when month or year changes
+  useEffect(() => {
+    if (token) {
+      fetchSettings();
+    }
+  }, [selectedMonth, selectedYear]);
 
   return (
     <div className="settings-container">
@@ -595,6 +743,7 @@ const ReminderSettings = () => {
                           value={formData.gst_reminder_1_date}
                           onChange={handleInputChange}
                           helpText="Date when the first gentle reminder should be sent for GST documents."
+                          onFocus={() => setGstReminderType(1)}
                         />
                         
                         <CommunicationDateInput
@@ -603,7 +752,62 @@ const ReminderSettings = () => {
                           value={formData.gst_reminder_2_date}
                           onChange={handleInputChange}
                           helpText="Date when the second urgent reminder should be sent for GST documents."
+                          onFocus={() => setGstReminderType(2)}
                         />
+
+                        <Card className="mt-3 mb-3">
+                          <Card.Header className="d-flex justify-content-between align-items-center">
+                            <strong>Sample GST Reminder Message</strong>
+                            <div>
+                              <Button 
+                                variant={gstReminderType === 1 ? "primary" : "outline-primary"} 
+                                size="sm" 
+                                className="me-2"
+                                onClick={() => setGstReminderType(1)}
+                              >
+                                Gentle
+                              </Button>
+                              <Button 
+                                variant={gstReminderType === 2 ? "danger" : "outline-danger"} 
+                                size="sm"
+                                onClick={() => setGstReminderType(2)}
+                              >
+                                Urgent
+                              </Button>
+                            </div>
+                          </Card.Header>
+                          <Card.Body style={{ fontSize: '0.9rem', backgroundColor: '#f8f9fa' }}>
+                            <p>
+                              <strong>
+                                {gstReminderType === 2 ? 
+                                  "⚠️ URGENT REMINDER" : 
+                                  "📢 Gentle reminder"}
+                              </strong>
+                            </p>
+                            <p>Dear <strong>client_name</strong>,</p>
+                            <p>This is {gstReminderType === 2 ? "an urgent" : "a gentle"} reminder to submit your pending <strong>GSTR 1 data</strong> for {months[selectedMonth]} {selectedYear}.</p>
+                            <p><strong>Due Date:</strong> {formData.gst_due_date && formData.gst_due_date !== '' ? 
+                              (() => {
+                                try {
+                                  const date = new Date(formData.gst_due_date);
+                                  return isNaN(date.getTime()) ? '[Due Date]' : 
+                                    date.toLocaleDateString('en-GB', { 
+                                      day: '2-digit', 
+                                      month: 'long', 
+                                      year: 'numeric' 
+                                    });
+                                } catch (e) {
+                                  return '[Due Date]';
+                                }
+                              })() 
+                              : '[Due Date]'
+                            }</p>
+                            <p>Act now to avoid late fees. Please ignore if documents have already been provided.</p>
+                            <p>Need assistance? Contact us ASAP.</p>
+                            <p>Thank you for your prompt attention 🤝</p>
+                            <p>Best regards,<br/>Team HPRT<br/>M. No. 966 468 7247</p>
+                          </Card.Body>
+                        </Card>
                       </Col>
                       
                       <Col md={6}>
@@ -629,6 +833,7 @@ const ReminderSettings = () => {
                           value={formData.tds_reminder_1_date}
                           onChange={handleInputChange}
                           helpText="Date when the first gentle reminder should be sent for TDS documents."
+                          onFocus={() => setTdsReminderType(1)}
                         />
                         
                         <CommunicationDateInput
@@ -637,7 +842,62 @@ const ReminderSettings = () => {
                           value={formData.tds_reminder_2_date}
                           onChange={handleInputChange}
                           helpText="Date when the second urgent reminder should be sent for TDS documents."
+                          onFocus={() => setTdsReminderType(2)}
                         />
+
+                        <Card className="mt-3 mb-3">
+                          <Card.Header className="d-flex justify-content-between align-items-center">
+                            <strong>Sample TDS Reminder Message</strong>
+                            <div>
+                              <Button 
+                                variant={tdsReminderType === 1 ? "primary" : "outline-primary"} 
+                                size="sm" 
+                                className="me-2"
+                                onClick={() => setTdsReminderType(1)}
+                              >
+                                Gentle
+                              </Button>
+                              <Button 
+                                variant={tdsReminderType === 2 ? "danger" : "outline-danger"} 
+                                size="sm"
+                                onClick={() => setTdsReminderType(2)}
+                              >
+                                Urgent
+                              </Button>
+                            </div>
+                          </Card.Header>
+                          <Card.Body style={{ fontSize: '0.9rem', backgroundColor: '#f8f9fa' }}>
+                            <p>
+                              <strong>
+                                {tdsReminderType === 2 ? 
+                                  "⚠️ URGENT REMINDER" : 
+                                  "📢 Gentle reminder"}
+                              </strong>
+                            </p>
+                            <p>Dear <strong>client_name</strong>,</p>
+                            <p>This is {tdsReminderType === 2 ? "an urgent" : "a gentle"} reminder to submit your pending <strong>TDS data and Bank statement</strong> for {months[selectedMonth]} {selectedYear}.</p>
+                            <p><strong>Due Date:</strong> {formData.tds_due_date && formData.tds_due_date !== '' ? 
+                              (() => {
+                                try {
+                                  const date = new Date(formData.tds_due_date);
+                                  return isNaN(date.getTime()) ? '[Due Date]' : 
+                                    date.toLocaleDateString('en-GB', { 
+                                      day: '2-digit', 
+                                      month: 'long', 
+                                      year: 'numeric' 
+                                    });
+                                } catch (e) {
+                                  return '[Due Date]';
+                                }
+                              })() 
+                              : '[Due Date]'
+                            }</p>
+                            <p>Act now to avoid late fees. Please ignore if documents have already been provided.</p>
+                            <p>Need assistance? Contact us ASAP.</p>
+                            <p>Thank you for your prompt attention 🤝</p>
+                            <p>Best regards,<br/>Team HPRT<br/>M. No. 966 468 7247</p>
+                          </Card.Body>
+                        </Card>
                       </Col>
                     </Row>
                     

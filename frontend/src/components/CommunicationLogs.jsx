@@ -205,18 +205,20 @@ const CommunicationLogs = () => {
       let csvContent = "sep=,\n";
       csvContent += `WhatsApp Logs (${formattedStartDate} - ${formattedEndDate})\n`;
       csvContent += `Generated on: ${new Date().toLocaleDateString('en-GB')}\n\n`;
-      csvContent += "SR No.,Date & Time,Group ID,Status,Message,Error\n";
+      csvContent += "SR No.,Date & Time,Client,Group ID,Status,Message,Error\n";
       
       logs.forEach((log, index) => {
-        const dateObj = log.sent_at || log.created_at ? new Date(log.sent_at || log.created_at) : new Date();
+        const dateObj = log.sent_at || log.created_at ? 
+          new Date(log.sent_at || log.created_at) : new Date();
         const formattedDate = dateObj.toLocaleDateString('en-GB', {
-          day: '2-digit', month: '2-digit', year: 'numeric',
+          day: '2-digit', month: '2-digit', year: 'numeric', 
           hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
         });
         
         const rowData = [
           index + 1,
           `"${formattedDate}"`,
+          `"${log.client_name || 'Unknown'}"`,
           `"${log.group_id || 'Not Applicable'}"`,
           `"${log.status || 'Not Applicable'}"`,
           `"${log.message ? log.message.replace(/"/g, '""') : 'Not Applicable'}"`,
@@ -299,6 +301,7 @@ const CommunicationLogs = () => {
       const tableData = whatsappLogs.map((log, index) => [
         index + 1,
         formatDateTime(log.sent_at || log.created_at || new Date()),
+        log.client_name || 'Unknown',
         log.group_id || 'Not Applicable',
         log.status || 'Not Applicable',
         log.message ? (log.message.length > 200 ? log.message.substring(0, 200) + '...' : log.message) : 'Not Applicable',
@@ -308,7 +311,7 @@ const CommunicationLogs = () => {
       // Apply autotable to the document using the correct syntax for jsPDF v3
       autoTable(doc, {
         startY: 35,
-        head: [['SR No.', 'Date & Time', 'Group ID', 'Status', 'Message', 'Error']],
+        head: [['SR No.', 'Date & Time', 'Client', 'Group ID', 'Status', 'Message', 'Error']],
         body: tableData,
         headStyles: { fillColor: [66, 139, 202], textColor: 255 },
         alternateRowStyles: { fillColor: [240, 240, 240] },
@@ -316,10 +319,11 @@ const CommunicationLogs = () => {
         columnStyles: {
           0: { cellWidth: 15 },
           1: { cellWidth: 45 },
-          2: { cellWidth: 45 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 120 },
-          5: { cellWidth: 50 }
+          2: { cellWidth: 30 },
+          3: { cellWidth: 45 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 120 },
+          6: { cellWidth: 50 }
         }
       });
       
@@ -788,6 +792,7 @@ const CommunicationLogs = () => {
             <thead>
               <tr>
                 <th>Date & Time</th>
+                <th>Client</th>
                 <th>Group ID</th>
                 <th>Status</th>
                 <th>Message</th>
@@ -798,6 +803,7 @@ const CommunicationLogs = () => {
               {whatsappLogs.map((log, index) => (
                 <tr key={index}>
                   <td>{formatDateTime(log.sent_at || log.created_at || new Date())}</td>
+                  <td>{log.client_name || 'Unknown'}</td>
                   <td>{log.group_id || 'Not Applicable'}</td>
                   <td>
                     <span className={`badge bg-${log.status === 'sent' ? 'success' : 'danger'}`}>
