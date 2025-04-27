@@ -31,9 +31,11 @@ async function getWhatsAppLogs(startDateTime, endDateTime) {
   }
   
   const result = await db.query(`
-    SELECT * FROM "user".whatsapp_logs
-    WHERE sent_at BETWEEN $1 AND $2 OR created_at BETWEEN $1 AND $2
-    ORDER BY sent_at DESC, created_at DESC
+    SELECT wl.*, c.name as client_name 
+    FROM "user".whatsapp_logs wl
+    LEFT JOIN "user".clients c ON wl.client_id = c.id
+    WHERE wl.sent_at BETWEEN $1 AND $2 OR wl.created_at BETWEEN $1 AND $2
+    ORDER BY wl.sent_at DESC, wl.created_at DESC
   `, [startDateTime.toISOString(), endDateTime.toISOString()]);
   
   return result.rows;
@@ -53,9 +55,11 @@ async function getEmailLogs(startDateTime, endDateTime) {
   }
   
   const result = await db.query(`
-    SELECT * FROM "user".email_logs
-    WHERE sent_at BETWEEN $1 AND $2
-    ORDER BY sent_at DESC
+    SELECT el.*, c.name as client_name
+    FROM "user".email_logs el
+    LEFT JOIN "user".clients c ON el.client_id = c.id
+    WHERE el.sent_at BETWEEN $1 AND $2
+    ORDER BY el.sent_at DESC
   `, [startDateTime.toISOString(), endDateTime.toISOString()]);
   
   return result.rows;
@@ -140,10 +144,8 @@ async function createEmailLog(logData) {
   const {
     client_id,
     to_email,
-    cc_emails,
     subject,
     body,
-    template_used,
     status,
     error_message,
     document_month,

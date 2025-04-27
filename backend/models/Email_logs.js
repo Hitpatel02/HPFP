@@ -4,6 +4,10 @@ module.exports = (sequelize, DataTypes) => {
   class EmailLogs extends Model {
     static associate(models) {
       // Define associations here
+      EmailLogs.belongsTo(models.Clients, {
+        foreignKey: 'client_id',
+        as: 'client'
+      });
     }
   }
 
@@ -15,10 +19,6 @@ module.exports = (sequelize, DataTypes) => {
         autoIncrement: true,
         allowNull: false,
       },
-      client_id: {
-        type: DataTypes.INTEGER,
-      },
-      // Standardized field names - we've removed the duplicates
       email_to: {
         type: DataTypes.STRING,
         allowNull: false,

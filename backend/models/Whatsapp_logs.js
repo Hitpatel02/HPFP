@@ -3,7 +3,10 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class WhatsappLogs extends Model {
     static associate(models) {
-      // Define associations here
+      WhatsappLogs.belongsTo(models.Clients, {
+        foreignKey: 'client_id',
+        as: 'client'
+      });
     }
   }
 

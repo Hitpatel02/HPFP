@@ -62,18 +62,47 @@ const createWhatsappLogsTable = async () => {
  * @param {string} message - The message that was sent
  * @param {string} status - The status of the message (sent/failed)
  * @param {string} errorMessage - Optional error message
+ * @param {number} clientId - Optional client ID (if known)
  */
-const logWhatsAppMessage = async (groupId, message, status, errorMessage = null) => {
+const logWhatsAppMessage = async (groupId, message, status, errorMessage = null, clientId = null) => {
     try {
         // First ensure the table exists
         await createWhatsappLogsTable();
         
+        // If client ID is not provided, try to look it up
+        if (!clientId) {
+            try {
+                const clientResult = await db.query(
+                    `SELECT id as client_id FROM "user".clients WHERE whatsapp_group_id = $1`,
+                    [groupId]
+                );
+                
+                if (clientResult.rows.length > 0) {
+                    clientId = clientResult.rows[0].client_id;
+                }
+                
+                // If not found in clients table, try client_groups table
+                if (!clientId) {
+                    const groupResult = await db.query(
+                        `SELECT client_id FROM "user".client_groups WHERE group_id = $1`,
+                        [groupId]
+                    );
+                    
+                    if (groupResult.rows.length > 0) {
+                        clientId = groupResult.rows[0].client_id;
+                    }
+                }
+            } catch (clientError) {
+                logger.warn(`Could not find client_id for group ${groupId}: ${clientError.message}`);
+            }
+        }
+        
         // Then log the message
         await db.query(
             `INSERT INTO "user".whatsapp_logs 
-             (group_id, message, status, sent_at, error_message) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [groupId, message, status, new Date(), errorMessage]
+             (client_id, group_id, message, status, sent_at, error_message) 
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [clientId, groupId, message, status, new Date(), errorMessage]
         );
         return true;
     } catch (error) {
@@ -667,11 +696,11 @@ async function sendReminderMessage(client, pendingDocs, reminderNumber, dueDate,
     const success = await sendGroupMessage(client.whatsapp_group_id, message);
     
     if (success) {
-        await logWhatsAppMessage(client.whatsapp_group_id, message, 'sent');
+        await logWhatsAppMessage(client.whatsapp_group_id, message, 'sent', null, client.id);
         console.log(`✅ Message successfully sent to ${client.name}`);
         return true;
     } else {
-        await logWhatsAppMessage(client.whatsapp_group_id, message, 'failed', 'Failed to send message');
+        await logWhatsAppMessage(client.whatsapp_group_id, message, 'failed', 'Failed to send message', client.id);
         console.log(`❌ Failed to send message to ${client.name}`);
         return false;
     }
