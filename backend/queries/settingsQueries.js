@@ -18,7 +18,7 @@ async function getLatestReminderSettings() {
            enable_whatsapp_reminders, enable_email_reminders,
            created_at, updated_at
      FROM "user".reminder_settings 
-     ORDER BY id DESC LIMIT 1`
+     ORDER BY updated_at DESC LIMIT 1`
   );
   
   return result.rows.length > 0 ? result.rows[0] : null;
@@ -242,34 +242,6 @@ async function deleteReminderSettings(id) {
 }
 
 /**
- * Get scheduler time from settings
- * @returns {Promise<{hour: number, minute: number, am_pm: string}>}
- */
-async function getSchedulerTime() {
-  try {
-    const settingsResult = await db.query(
-      `SELECT scheduler_hour, scheduler_minute, scheduler_am_pm 
-       FROM "user".reminder_settings 
-       ORDER BY id DESC LIMIT 1`
-    );
-
-    if (settingsResult.rows.length > 0) {
-      const settings = settingsResult.rows[0];
-      return { 
-        hour: settings.scheduler_hour || 9, 
-        minute: settings.scheduler_minute || 0,
-        am_pm: settings.scheduler_am_pm || 'AM'
-      };
-    }
-    
-    return { hour: 9, minute: 0, am_pm: 'AM' }; // Default
-  } catch (error) {
-    console.error('Error getting scheduler time:', error);
-    return { hour: 9, minute: 0, am_pm: 'AM' }; // Default on error
-  }
-}
-
-/**
  * Reset all reminder dates
  * @param {number} id - Settings ID
  * @returns {Promise<void>}
@@ -332,7 +304,6 @@ module.exports = {
   createReminderSettings,
   updateReminderSettings,
   deleteReminderSettings,
-  getSchedulerTime,
   resetReminderDates,
   getClientsForReminder,
   markReminderSent

@@ -60,10 +60,19 @@ app.get('/health', (req, res) => {
 const createDocumentsIfFirstOfMonth = async () => {
   // Check if today is the 1st of the month
   const today = new Date();
-  const isFirstOfMonth = today.getDate() === 1;
-  
-  if (isFirstOfMonth) {
-    const previousMonth = getPreviousMonthFormatted();
+  const dayOfMonth = today.getDate();
+  const dayOfWeek = today.getDay(); // 0 for Sunday, 1 for Monday, etc.
+  let createForPreviousMonth = false;
+
+  if (dayOfMonth === 1) {
+    if (dayOfWeek !== 0) { // If not Sunday
+      createForPreviousMonth = true;
+    }
+  } else if (dayOfMonth === 2 && dayOfWeek === 1) { // If it's the 2nd of the month and it's Monday (meaning 1st was Sunday)
+      createForPreviousMonth = true
+  }
+  if (createForPreviousMonth) {
+      const previousMonth = getPreviousMonthFormatted();
     console.log(`Server started on 1st of month. Creating document records for all clients for ${previousMonth}...`);
     try {
       const results = await documentService.createDocumentsForAllClients(previousMonth);

@@ -17,7 +17,7 @@ const isTodayReminderDay = async () => {
   try {
     // Get current reminder settings
     const settings = await settingsQueries.getLatestReminderSettings();
-
+    console.log(settings)
     if (!settings) {
       console.log('⚠️ No reminder settings found.');
       return false;
@@ -40,58 +40,6 @@ const isTodayReminderDay = async () => {
   } catch (error) {
     console.error('❌ Error checking if today is a reminder day:', error);
     return false;
-  }
-};
-
-/**
- * Get the scheduler time from database settings
- * @returns {Promise<{hour: number, minute: number}>}
- */
-const getSchedulerTime = async () => {
-  try {
-    // Get scheduler time from settings
-    const schedulerTime = await settingsQueries.getSchedulerTime();
-    
-    // Convert to 24-hour format for cron job
-    let hour = schedulerTime.hour;
-    if (schedulerTime.am_pm === 'PM' && hour < 12) {
-      hour += 12;
-    } else if (schedulerTime.am_pm === 'AM' && hour === 12) {
-      hour = 0;
-    }
-    
-    return { 
-      hour, 
-      minute: schedulerTime.minute 
-    };
-  } catch (error) {
-    console.error('❌ Error getting scheduler time:', error);
-    return { hour: 9, minute: 0 }; // Default to 9:00 AM
-  }
-};
-
-/**
- * Configure and return a cron job schedule based on the user-defined time
- */
-const configureCronSchedule = async () => {
-  const { hour, minute } = await getSchedulerTime();
-  
-  // Format for cron expression
-  return `${minute} ${hour} * * *`;
-};
-
-/**
- * Stop any currently running scheduled tasks
- */
-const stopScheduledTasks = () => {
-  if (reminderTask) {
-    reminderTask.stop();
-    console.log('📅 Stopped existing reminder task');
-  }
-  
-  if (reportTask) {
-    reportTask.stop();
-    console.log('📅 Stopped existing report task');
   }
 };
 
@@ -204,9 +152,6 @@ const runReminderJob = async () => {
   console.log(`🚀 Running reminder job at: ${new Date().toLocaleString()}`);
   
   try {
-    // Initialize WhatsApp for reminders if enabled
-    await initWhatsAppForReminders();
-    
     // Run email and WhatsApp reminders in parallel
     await Promise.all([
       (async () => {
@@ -344,21 +289,6 @@ const runTaskImmediately = async (taskName) => {
         default:
             throw new Error(`Unknown task: ${taskName}`);
     }
-};
-
-/**
- * Check if WhatsApp reminders are enabled
- * @returns {Promise<boolean>} - Whether WhatsApp reminders are enabled
- */
-const isWhatsAppRemindersEnabled = async () => {
-  try {
-    const settings = await settingsQueries.getLatestReminderSettings();
-    
-    return settings && settings.enable_whatsapp_reminders;
-  } catch (error) {
-    console.error('❌ Error checking if WhatsApp reminders are enabled:', error);
-    return false;
-  }
 };
 
 module.exports = { initializeScheduledTasks, runTaskImmediately, reloadScheduler }; 

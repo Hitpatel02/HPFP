@@ -16,7 +16,7 @@ const sendEmailReminders = async () => {
 
     // Get current reminder settings
     const settingsResult = await db.query(
-      `SELECT * FROM "user".reminder_settings ORDER BY id DESC LIMIT 1`
+      `SELECT * FROM "user".reminder_settings ORDER BY updated_at DESC LIMIT 1`
     );
 
     if (settingsResult.rows.length === 0) {
@@ -73,7 +73,9 @@ const sendEmailReminders = async () => {
        JOIN "user".client_documents cd ON c.id = cd.client_id
        WHERE 
           (NOT cd.gst_1_received OR NOT cd.bank_statement_received OR NOT cd.tds_received)
-          AND (c.email_id_1 IS NOT NULL OR c.email_id_2 IS NOT NULL OR c.email_id_3 IS NOT NULL)`,
+          AND (c.email_id_1 IS NOT NULL OR c.email_id_2 IS NOT NULL OR c.email_id_3 IS NOT NULL)
+          AND cd.document_month = TRIM(TO_CHAR((CURRENT_DATE - INTERVAL '1 month'), 'Month')) || ' ' || EXTRACT(YEAR FROM (CURRENT_DATE - INTERVAL '1 month'))
+        `,
       []
     );
 

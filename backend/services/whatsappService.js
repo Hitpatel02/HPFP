@@ -31,7 +31,7 @@ const checkWhatsappLogsTable = async () => {
 const createWhatsappLogsTable = async () => {
     try {
         const tableExists = await checkWhatsappLogsTable();
-        
+
         if (!tableExists) {
             logger.info('Creating whatsapp_logs table...');
             await db.query(`
@@ -48,7 +48,7 @@ const createWhatsappLogsTable = async () => {
             logger.info('whatsapp_logs table created successfully');
             return true;
         }
-        
+
         return true;
     } catch (error) {
         logger.error('Error creating whatsapp_logs table:', error);
@@ -68,7 +68,7 @@ const logWhatsAppMessage = async (groupId, message, status, errorMessage = null,
     try {
         // First ensure the table exists
         await createWhatsappLogsTable();
-        
+
         // If client ID is not provided, try to look it up
         if (!clientId) {
             try {
@@ -76,18 +76,18 @@ const logWhatsAppMessage = async (groupId, message, status, errorMessage = null,
                     `SELECT id as client_id FROM "user".clients WHERE whatsapp_group_id = $1`,
                     [groupId]
                 );
-                
+
                 if (clientResult.rows.length > 0) {
                     clientId = clientResult.rows[0].client_id;
                 }
-                
+
                 // If not found in clients table, try client_groups table
                 if (!clientId) {
                     const groupResult = await db.query(
                         `SELECT client_id FROM "user".client_groups WHERE group_id = $1`,
                         [groupId]
                     );
-                    
+
                     if (groupResult.rows.length > 0) {
                         clientId = groupResult.rows[0].client_id;
                     }
@@ -96,7 +96,7 @@ const logWhatsAppMessage = async (groupId, message, status, errorMessage = null,
                 logger.warn(`Could not find client_id for group ${groupId}: ${clientError.message}`);
             }
         }
-        
+
         // Then log the message
         await db.query(
             `INSERT INTO "user".whatsapp_logs 
@@ -120,13 +120,13 @@ const logWhatsAppMessage = async (groupId, message, status, errorMessage = null,
 const getReminderSettings = async () => {
     try {
         const settingsResult = await db.query(
-            `SELECT * FROM "user".reminder_settings ORDER BY id DESC LIMIT 1`
+            `SELECT * FROM "user".reminder_settings ORDER BY updated_at DESC LIMIT 1`
         );
 
         if (settingsResult.rows.length === 0) {
             throw new Error('No reminder settings found');
         }
-
+        
         return settingsResult.rows[0];
     } catch (error) {
         logger.error('Error getting reminder settings:', error);
@@ -169,33 +169,33 @@ const initWhatsAppForReminders = async () => {
         const settingsResult = await db.query(
             `SELECT enable_whatsapp_reminders FROM "user".reminder_settings ORDER BY id DESC LIMIT 1`
         );
-        
+
         if (settingsResult.rows.length === 0 || !settingsResult.rows[0].enable_whatsapp_reminders) {
             console.log('⚠️ WhatsApp reminders are disabled in settings. Skipping WhatsApp initialization.');
             return false;
         }
-        
+
         // If WhatsApp is already ready, no need to initialize
         if (isWhatsAppReady()) {
             console.log('✅ WhatsApp client is already initialized and ready.');
             return true;
         }
-        
+
         // Initialize WhatsApp client
         console.log('🚀 Automatically initializing WhatsApp client for sending reminders...');
         const success = await initializeWhatsApp();
-        
+
         // Wait for up to 30 seconds for the client to become ready
         if (success) {
             let attempts = 0;
             const maxAttempts = 15; // 15 attempts, 2 seconds each = 30 seconds max wait
-            
+
             while (!isWhatsAppReady() && attempts < maxAttempts) {
                 console.log(`⏳ Waiting for WhatsApp client to become ready (${attempts + 1}/${maxAttempts})...`);
                 await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between checks
                 attempts++;
             }
-            
+
             if (isWhatsAppReady()) {
                 console.log('✅ WhatsApp client is now ready for sending reminders.');
                 return true;
@@ -204,7 +204,7 @@ const initWhatsAppForReminders = async () => {
                 return false;
             }
         }
-        
+
         return false;
     } catch (error) {
         console.error('❌ Error initializing WhatsApp for reminders:', error);
@@ -218,30 +218,36 @@ const initWhatsAppForReminders = async () => {
  */
 const sendWhatsAppReminders = async () => {
     try {
+        // Get reminder settings
+        const settings = await getReminderSettings();
+
+        // Check if email reminders are enabled
+        if (!settings.enable_whatsapp_reminders) {
+            console.log('⚠️ Whatsapp reminders are disabled in settings. Skipping Whatsapp reminders.');
+            return;
+        }
         // Auto-initialize WhatsApp if reminders are enabled
         const whatsAppReady = await initWhatsAppForReminders();
-        
+
         if (!whatsAppReady) {
             console.log('⚠️ WhatsApp client is not ready. Skipping WhatsApp reminders.');
             return { success: 0, failed: 0 };
         }
-        
+
         logger.info('Starting WhatsApp reminder process');
         
-        // Get reminder settings
-        const settings = await getReminderSettings();
         
         // Check if today is a GST reminder date
         // Get reminder dates and ensure proper formatting
         let gstReminder1Date = null;
         let gstReminder2Date = null;
-        
+
         try {
             if (settings.gst_reminder_1_date) {
                 gstReminder1Date = DateTime.fromJSDate(new Date(settings.gst_reminder_1_date)).toFormat('yyyy-MM-dd');
                 console.log('GST Reminder 1 Date:', gstReminder1Date);
             }
-            
+
             if (settings.gst_reminder_2_date) {
                 gstReminder2Date = DateTime.fromJSDate(new Date(settings.gst_reminder_2_date)).toFormat('yyyy-MM-dd');
                 console.log('GST Reminder 2 Date:', gstReminder2Date);
@@ -250,23 +256,23 @@ const sendWhatsAppReminders = async () => {
             console.error('Error parsing GST reminder dates:', dateError);
             // Continue with null values if parsing fails
         }
-        
+
         const isGstFirstReminderDay = gstReminder1Date && DateTime.now().toFormat("yyyy-MM-dd") === gstReminder1Date;
         const isGstSecondReminderDay = gstReminder2Date && DateTime.now().toFormat("yyyy-MM-dd") === gstReminder2Date;
         const isGstReminderDay = isGstFirstReminderDay || isGstSecondReminderDay;
-        
+
         console.log(`Is GST Reminder 1 Day: ${isGstFirstReminderDay}, Is GST Reminder 2 Day: ${isGstSecondReminderDay}`);
-        
+
         // Check if today is a TDS reminder date
         let tdsReminder1Date = null;
         let tdsReminder2Date = null;
-        
+
         try {
             if (settings.tds_reminder_1_date) {
                 tdsReminder1Date = DateTime.fromJSDate(new Date(settings.tds_reminder_1_date)).toFormat('yyyy-MM-dd');
                 console.log('TDS Reminder 1 Date:', tdsReminder1Date);
             }
-            
+
             if (settings.tds_reminder_2_date) {
                 tdsReminder2Date = DateTime.fromJSDate(new Date(settings.tds_reminder_2_date)).toFormat('yyyy-MM-dd');
                 console.log('TDS Reminder 2 Date:', tdsReminder2Date);
@@ -275,22 +281,25 @@ const sendWhatsAppReminders = async () => {
             console.error('Error parsing TDS reminder dates:', dateError);
             // Continue with null values if parsing fails
         }
-        
+
         const isTdsFirstReminderDay = tdsReminder1Date && DateTime.now().toFormat("yyyy-MM-dd") === tdsReminder1Date;
         const isTdsSecondReminderDay = tdsReminder2Date && DateTime.now().toFormat("yyyy-MM-dd") === tdsReminder2Date;
         const isTdsReminderDay = isTdsFirstReminderDay || isTdsSecondReminderDay;
-        
+
         console.log(`Is TDS Reminder 1 Day: ${isTdsFirstReminderDay}, Is TDS Reminder 2 Day: ${isTdsSecondReminderDay}`);
-        
+
         // Skip if today is not any reminder day
         if (!isGstReminderDay && !isTdsReminderDay) {
             console.log('⚠️ Today is not a reminder day for GST or TDS. Skipping WhatsApp reminders.');
             return { success: 0, failed: 0 };
         }
-        
+
         // Get clients with WhatsApp IDs and pending documents
         const clientsResult = await db.query(`
-            SELECT c.id, c.name, c.whatsapp_group_id,
+            SELECT 
+                c.id, 
+                c.name, 
+                c.whatsapp_group_id,
                 cd.document_month,
                 cd.gst_1_received,
                 cd.bank_statement_received,
@@ -298,11 +307,17 @@ const sendWhatsAppReminders = async () => {
                 c.gst_1_enabled,
                 c.bank_statement_enabled,
                 c.tds_document_enabled
-            FROM "user".clients c
-            JOIN "user".client_documents cd ON c.id = cd.client_id
-            WHERE c.whatsapp_group_id IS NOT NULL 
-            AND c.whatsapp_group_id != ''
-            AND (NOT cd.gst_1_received OR NOT cd.bank_statement_received OR NOT cd.tds_received)
+            FROM 
+                "user".clients c
+            JOIN 
+                "user".client_documents cd 
+            ON 
+                c.id = cd.client_id
+            WHERE 
+                c.whatsapp_group_id IS NOT NULL 
+                AND c.whatsapp_group_id != ''
+                AND (NOT cd.gst_1_received OR NOT cd.bank_statement_received OR NOT cd.tds_received)
+                AND cd.document_month = TRIM(TO_CHAR((CURRENT_DATE - INTERVAL '1 month'), 'Month')) || ' ' || EXTRACT(YEAR FROM (CURRENT_DATE - INTERVAL '1 month'))
         `);
 
         logger.info(`Found ${clientsResult.rows.length} clients with WhatsApp group IDs and pending documents`);
@@ -314,11 +329,11 @@ const sendWhatsAppReminders = async () => {
 
         let successCount = 0;
         let failedCount = 0;
-        
+
         // Determine which reminder number we're sending today
         const gstReminderNumber = isGstFirstReminderDay ? 1 : (isGstSecondReminderDay ? 2 : 0);
         const tdsReminderNumber = isTdsFirstReminderDay ? 1 : (isTdsSecondReminderDay ? 2 : 0);
-        
+
         // Check due dates for urgency
         const gstDueDate = DateTime.fromJSDate(new Date(settings.gst_due_date));
         const tdsDueDate = DateTime.fromJSDate(new Date(settings.tds_due_date));
@@ -332,15 +347,15 @@ const sendWhatsAppReminders = async () => {
                 const needsGst = !client.gst_1_received && client.gst_1_enabled;
                 const needsBank = !client.bank_statement_received && client.bank_statement_enabled;
                 const needsTds = !client.tds_received && client.tds_document_enabled;
-                
+
                 // Skip if all documents are submitted or not applicable
                 if (!needsGst && !needsBank && !needsTds) {
                     console.log(`⏭️ Skipping WhatsApp message for ${client.name}, all applicable documents are received.`);
                     continue;
                 }
-                
+
                 console.log(`Processing ${client.name} - GST: ${needsGst ? 'Pending' : (client.gst_1_enabled ? 'Received' : 'Not applicable')}, Bank: ${needsBank ? 'Pending' : (client.bank_statement_enabled ? 'Received' : 'Not applicable')}, TDS: ${needsTds ? 'Pending' : (client.tds_document_enabled ? 'Received' : 'Not applicable')}`);
-                
+
                 // Now implement document grouping logic similar to emailService
                 // Scenario 1: All 3 documents applicable
                 if (needsGst && needsTds && needsBank) {
@@ -349,20 +364,20 @@ const sendWhatsAppReminders = async () => {
                         const tdsBankDocs = [];
                         if (needsTds) tdsBankDocs.push("TDS data");
                         if (needsBank) tdsBankDocs.push("Bank statement");
-                        
+
                         if (tdsBankDocs.length > 0) {
                             console.log(`Sending ${tdsBankDocs.join(' and ')} reminder to ${client.name}`);
                             const success = await sendReminderMessage(client, tdsBankDocs, tdsReminderNumber, settings.tds_due_date, isTdsPastDue);
-                            
+
                             if (success) {
                                 successCount++;
-                                
+
                                 // Update reminder status for each document type
                                 if (tdsReminderNumber > 0) {
                                     try {
-                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
-                                        
+                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+
                                         if (tdsBankDocs.includes("TDS data")) {
                                             await updateReminderStatus(client.id, documentMonth, tdsReminderNumber, "tds");
                                         }
@@ -376,40 +391,40 @@ const sendWhatsAppReminders = async () => {
                             } else {
                                 failedCount++;
                             }
-                            
+
                             // Random delay between messages (2-10 seconds)
                             const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                            console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
+                            console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
                             await new Promise(resolve => setTimeout(resolve, randomDelay));
                         }
                     }
-                    
+
                     // For GST, use GST reminder dates (always separate)
                     if (isGstReminderDay) {
                         console.log(`Sending GSTR 1 data reminder to ${client.name}`);
                         const success = await sendReminderMessage(client, ["GSTR 1 data"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
-                    
-                    if (success) {
-                        successCount++;
-                        
-                        // Update GST reminder status
-                        if (gstReminderNumber > 0) {
-                            try {
-                                const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                     (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
-                                await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "gst");
-                            } catch (updateError) {
-                                console.error(`Error updating GST reminder status: ${updateError.message}`);
+
+                        if (success) {
+                            successCount++;
+
+                            // Update GST reminder status
+                            if (gstReminderNumber > 0) {
+                                try {
+                                    const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                        (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+                                    await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "gst");
+                                } catch (updateError) {
+                                    console.error(`Error updating GST reminder status: ${updateError.message}`);
+                                }
                             }
+                        } else {
+                            failedCount++;
                         }
-                    } else {
-                        failedCount++;
-                    }
-                    
-                    // Random delay between messages (2-10 seconds)
-                    const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                    console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
-                    await new Promise(resolve => setTimeout(resolve, randomDelay));
+
+                        // Random delay between messages (2-10 seconds)
+                        const randomDelay = Math.floor(Math.random() * 8000) + 2000;
+                        console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
+                        await new Promise(resolve => setTimeout(resolve, randomDelay));
                     }
                 }
                 // Scenario 2: 2 documents applicable
@@ -423,15 +438,15 @@ const sendWhatsAppReminders = async () => {
                         if (isGstReminderDay) {
                             console.log(`Sending GSTR 1 data reminder to ${client.name}`);
                             const success = await sendReminderMessage(client, ["GSTR 1 data"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
-                            
+
                             if (success) {
                                 successCount++;
-                                
+
                                 // Update GST reminder status
                                 if (gstReminderNumber > 0) {
                                     try {
-                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
                                         await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "gst");
                                     } catch (updateError) {
                                         console.error(`Error updating GST reminder status: ${updateError.message}`);
@@ -440,39 +455,39 @@ const sendWhatsAppReminders = async () => {
                             } else {
                                 failedCount++;
                             }
-                            
+
                             // Random delay between messages (2-10 seconds)
                             const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                            console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
+                            console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
                             await new Promise(resolve => setTimeout(resolve, randomDelay));
                         }
-                        
+
                         if (isTdsReminderDay) {
                             console.log(`Sending TDS data reminder to ${client.name}`);
                             const success = await sendReminderMessage(client, ["TDS data"], tdsReminderNumber, settings.tds_due_date, isTdsPastDue);
-                    
-                    if (success) {
-                        successCount++;
-                        
-                        // Update TDS reminder status
-                        if (tdsReminderNumber > 0) {
-                            try {
-                                const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                     (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
-                                await updateReminderStatus(client.id, documentMonth, tdsReminderNumber, "tds");
-                            } catch (updateError) {
-                                console.error(`Error updating TDS reminder status: ${updateError.message}`);
+
+                            if (success) {
+                                successCount++;
+
+                                // Update TDS reminder status
+                                if (tdsReminderNumber > 0) {
+                                    try {
+                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+                                        await updateReminderStatus(client.id, documentMonth, tdsReminderNumber, "tds");
+                                    } catch (updateError) {
+                                        console.error(`Error updating TDS reminder status: ${updateError.message}`);
+                                    }
+                                }
+                            } else {
+                                failedCount++;
                             }
+
+                            // Random delay between messages (2-10 seconds)
+                            const randomDelay = Math.floor(Math.random() * 8000) + 2000;
+                            console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
+                            await new Promise(resolve => setTimeout(resolve, randomDelay));
                         }
-                    } else {
-                        failedCount++;
-                    }
-                    
-                    // Random delay between messages (2-10 seconds)
-                    const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                    console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
-                    await new Promise(resolve => setTimeout(resolve, randomDelay));
-                }
                     }
                     // Case 2: GST and Bank Statement - Group together with GST dates
                     else if (needsGst && needsBank) {
@@ -480,20 +495,20 @@ const sendWhatsAppReminders = async () => {
                             const gstBankDocs = [];
                             if (needsGst) gstBankDocs.push("GSTR 1 data");
                             if (needsBank) gstBankDocs.push("Bank statement");
-                            
+
                             if (gstBankDocs.length > 0) {
                                 console.log(`Sending ${gstBankDocs.join(' and ')} reminder to ${client.name}`);
                                 const success = await sendReminderMessage(client, gstBankDocs, gstReminderNumber, settings.gst_due_date, isGstPastDue);
-                                
+
                                 if (success) {
                                     successCount++;
-                                    
+
                                     // Update reminder status for each document type
                                     if (gstReminderNumber > 0) {
                                         try {
-                                            const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                                (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
-                                            
+                                            const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                                (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+
                                             if (gstBankDocs.includes("GSTR 1 data")) {
                                                 await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "gst");
                                             }
@@ -507,10 +522,10 @@ const sendWhatsAppReminders = async () => {
                                 } else {
                                     failedCount++;
                                 }
-                                
+
                                 // Random delay between messages (2-10 seconds)
                                 const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                                console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
+                                console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
                                 await new Promise(resolve => setTimeout(resolve, randomDelay));
                             }
                         }
@@ -521,20 +536,20 @@ const sendWhatsAppReminders = async () => {
                             const tdsBankDocs = [];
                             if (needsTds) tdsBankDocs.push("TDS data");
                             if (needsBank) tdsBankDocs.push("Bank statement");
-                            
+
                             if (tdsBankDocs.length > 0) {
                                 console.log(`Sending ${tdsBankDocs.join(' and ')} reminder to ${client.name}`);
                                 const success = await sendReminderMessage(client, tdsBankDocs, tdsReminderNumber, settings.tds_due_date, isTdsPastDue);
-                                
+
                                 if (success) {
                                     successCount++;
-                                    
+
                                     // Update reminder status for each document type
                                     if (tdsReminderNumber > 0) {
                                         try {
-                                            const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                                (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
-                                            
+                                            const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                                (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+
                                             if (tdsBankDocs.includes("TDS data")) {
                                                 await updateReminderStatus(client.id, documentMonth, tdsReminderNumber, "tds");
                                             }
@@ -548,10 +563,10 @@ const sendWhatsAppReminders = async () => {
                                 } else {
                                     failedCount++;
                                 }
-                                
+
                                 // Random delay between messages (2-10 seconds)
                                 const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                                console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
+                                console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
                                 await new Promise(resolve => setTimeout(resolve, randomDelay));
                             }
                         }
@@ -564,27 +579,27 @@ const sendWhatsAppReminders = async () => {
                         if (isGstReminderDay) {
                             console.log(`Sending GSTR 1 data reminder to ${client.name}`);
                             const success = await sendReminderMessage(client, ["GSTR 1 data"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
-                            
+
                             if (success) {
                                 successCount++;
-                                
+
                                 // Update GST reminder status
                                 if (gstReminderNumber > 0) {
                                     try {
-                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
                                         await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "gst");
                                     } catch (updateError) {
                                         console.error(`Error updating GST reminder status: ${updateError.message}`);
                                     }
                                 }
-                    } else {
+                            } else {
                                 failedCount++;
                             }
-                            
+
                             // Random delay between messages (2-10 seconds)
                             const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                            console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
+                            console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
                             await new Promise(resolve => setTimeout(resolve, randomDelay));
                         }
                     }
@@ -593,15 +608,15 @@ const sendWhatsAppReminders = async () => {
                         if (isTdsReminderDay) {
                             console.log(`Sending TDS data reminder to ${client.name}`);
                             const success = await sendReminderMessage(client, ["TDS data"], tdsReminderNumber, settings.tds_due_date, isTdsPastDue);
-                            
+
                             if (success) {
                                 successCount++;
-                                
+
                                 // Update TDS reminder status
                                 if (tdsReminderNumber > 0) {
                                     try {
-                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
                                         await updateReminderStatus(client.id, documentMonth, tdsReminderNumber, "tds");
                                     } catch (updateError) {
                                         console.error(`Error updating TDS reminder status: ${updateError.message}`);
@@ -610,42 +625,42 @@ const sendWhatsAppReminders = async () => {
                             } else {
                                 failedCount++;
                             }
-                            
+
                             // Random delay between messages (2-10 seconds)
                             const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                            console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
+                            console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
                             await new Promise(resolve => setTimeout(resolve, randomDelay));
                         }
                     }
                     // Only Bank Statement applicable
                     else if (!needsGst && !needsTds && needsBank) {
                         // For Bank statement alone, use any reminder day (prioritize GST if both are available)
-                        
+
                         if (isGstReminderDay) {
                             console.log(`Sending Bank statement reminder to ${client.name}`);
                             const success = await sendReminderMessage(client, ["Bank statement"], gstReminderNumber, settings.gst_due_date, isGstPastDue);
-                        
-                        if (success) {
-                            successCount++;
-                            
-                            // Update Bank reminder status
-                            if (gstReminderNumber > 0) {
-                                try {
-                                    const documentMonth = typeof client.document_month === 'string' ? client.document_month : 
-                                                         (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
-                                    await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "bank");
-                                } catch (updateError) {
-                                    console.error(`Error updating Bank reminder status: ${updateError.message}`);
+
+                            if (success) {
+                                successCount++;
+
+                                // Update Bank reminder status
+                                if (gstReminderNumber > 0) {
+                                    try {
+                                        const documentMonth = typeof client.document_month === 'string' ? client.document_month :
+                                            (client.document_month instanceof Date ? client.document_month.toISOString() : String(client.document_month));
+                                        await updateReminderStatus(client.id, documentMonth, gstReminderNumber, "bank");
+                                    } catch (updateError) {
+                                        console.error(`Error updating Bank reminder status: ${updateError.message}`);
+                                    }
                                 }
+                            } else {
+                                failedCount++;
                             }
-                        } else {
-                            failedCount++;
-                        }
-                        
-                        // Random delay between messages (2-10 seconds)
-                        const randomDelay = Math.floor(Math.random() * 8000) + 2000;
-                        console.log(`Adding random delay of ${randomDelay/1000} seconds to avoid WhatsApp rate limiting`);
-                        await new Promise(resolve => setTimeout(resolve, randomDelay));
+
+                            // Random delay between messages (2-10 seconds)
+                            const randomDelay = Math.floor(Math.random() * 8000) + 2000;
+                            console.log(`Adding random delay of ${randomDelay / 1000} seconds to avoid WhatsApp rate limiting`);
+                            await new Promise(resolve => setTimeout(resolve, randomDelay));
                         }
                     }
                 }
@@ -679,22 +694,22 @@ async function sendReminderMessage(client, pendingDocs, reminderNumber, dueDate,
     // Prepare message
     let messageIntro;
     const isUrgent = reminderNumber === 2 || isPastDue;
-    
+
     if (isUrgent) {
         messageIntro = `*⚠️ URGENT REMINDER*\n\nDear sir,\n\nThis is an urgent reminder to submit your pending ${pendingDocs.join(", ")} for ${client.document_month} immediately.`;
     } else {
         messageIntro = `*📢 Gentle Reminder*\n\nDear sir,\n\nThis is a gentle reminder to submit your pending ${pendingDocs.join(", ")} for ${client.document_month}.`;
     }
-    
+
     const dueDateInfo = `\n\n*Due Date:* ${DateTime.fromJSDate(new Date(dueDate)).toFormat('dd MMMM yyyy')}`;
     const urgencyNote = isPastDue ? "\n\n*Note:* This submission is now OVERDUE." : "";
     const callToAction = "\n\nAct now to avoid late fees. Please ignore if documents have already been provided.";
-    
+
     const message = `${messageIntro}${dueDateInfo}${urgencyNote}${callToAction}\n\nNeed assistance? Contact us ASAP.\n\nThank you for your prompt attention 🤝\n\nBest regards,\nTeam HPRT\nM. No. 966 468 7247`;
-    
+
     logger.info(`Sending message to group: ${client.whatsapp_group_id}`);
     const success = await sendGroupMessage(client.whatsapp_group_id, message);
-    
+
     if (success) {
         await logWhatsAppMessage(client.whatsapp_group_id, message, 'sent', null, client.id);
         console.log(`✅ Message successfully sent to ${client.name}`);
@@ -713,7 +728,7 @@ async function sendReminderMessage(client, pendingDocs, reminderNumber, dueDate,
 async function updateReminderStatus(clientId, documentMonth, reminderNumber, documentType) {
     try {
         let columnPrefix = '';
-        
+
         switch (documentType) {
             case 'gst':
                 columnPrefix = 'gst_1_reminder_';
@@ -727,10 +742,10 @@ async function updateReminderStatus(clientId, documentMonth, reminderNumber, doc
             default:
                 columnPrefix = 'reminder_';
         }
-        
+
         // Format date as ISO string for compatibility
         const currentTimestamp = new Date().toISOString();
-        
+
         console.log(`Updating reminder status with the following details:`);
         console.log(`- Client ID: ${clientId}`);
         console.log(`- Document Month: ${documentMonth}`);
@@ -738,7 +753,7 @@ async function updateReminderStatus(clientId, documentMonth, reminderNumber, doc
         console.log(`- Document Type: ${documentType}`);
         console.log(`- Column Prefix: ${columnPrefix}`);
         console.log(`- Current Timestamp: ${currentTimestamp}`);
-        
+
         // Construct query
         const query = `
             UPDATE "user".client_documents 
@@ -747,34 +762,34 @@ async function updateReminderStatus(clientId, documentMonth, reminderNumber, doc
             WHERE client_id = $1 AND document_month = $2
             RETURNING id, ${columnPrefix}${reminderNumber}_sent, ${columnPrefix}${reminderNumber}_sent_date
         `;
-        
+
         console.log(`Executing query: ${query.replace(/\s+/g, ' ')}`);
-        
+
         // Execute query with return values for confirmation
         const result = await db.query(query, [clientId, documentMonth, currentTimestamp]);
-        
+
         if (result.rows && result.rows.length > 0) {
             console.log(`✅ Successfully updated ${documentType} reminder ${reminderNumber} status for client ID ${clientId}`);
             console.log(`Updated record:`, result.rows[0]);
         } else {
             console.warn(`⚠️ No records were updated for client ID ${clientId}. Document may not exist for month ${documentMonth}`);
         }
-        
+
         return result.rows && result.rows.length > 0;
     } catch (error) {
         console.error(`❌ Error updating ${documentType} reminder ${reminderNumber} status for client ID ${clientId}:`, error);
-        logger.error(`Error updating reminder status: ${error.message}`, { 
-            clientId, documentMonth, reminderNumber, documentType, error: error.stack 
+        logger.error(`Error updating reminder status: ${error.message}`, {
+            clientId, documentMonth, reminderNumber, documentType, error: error.stack
         });
         return false;
     }
 }
 
 module.exports = {
-  sendWhatsAppReminders,
-  initWhatsAppForReminders,
-  sendGroupMessage,
-  validateGroupId,
-  checkWhatsappLogsTable,
-  logWhatsAppMessage
+    sendWhatsAppReminders,
+    initWhatsAppForReminders,
+    sendGroupMessage,
+    validateGroupId,
+    checkWhatsappLogsTable,
+    logWhatsAppMessage
 };
