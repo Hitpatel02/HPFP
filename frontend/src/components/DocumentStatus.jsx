@@ -3,6 +3,7 @@ import { Container, Table, Alert, Spinner, Card, Form, Button, Badge } from 'rea
 import { useSelector } from 'react-redux';
 import { selectToken } from '../redux/authSlice';
 import { documentsAPI } from '../api';
+import { getPreviousMonthFormatted } from '../utils/dateUtils';
 
 const DocumentStatus = () => {
   const token = useSelector(selectToken);
@@ -29,6 +30,18 @@ const DocumentStatus = () => {
       // Extract unique months for filtering
       const uniqueMonths = [...new Set(data.map(doc => doc.document_month))];
       setMonths(uniqueMonths);
+      
+      // Get the previous month in the expected format
+      const previousMonth = getPreviousMonthFormatted();
+      
+      // Set the filter to the previous month if it exists in our data
+      if (uniqueMonths.includes(previousMonth)) {
+        setFilterMonth(previousMonth);
+      } else if (uniqueMonths.length > 0) {
+        // If previous month doesn't exist, use the most recent month
+        const sortedMonths = [...uniqueMonths].sort().reverse();
+        setFilterMonth(sortedMonths[0]);
+      }
       
     } catch (err) {
       setError(err.message);
@@ -92,8 +105,8 @@ const DocumentStatus = () => {
         <>
           <h3>Pending Documents</h3>
           {filteredDocuments.length === 0 ? (
-            <Alert variant="info">
-              No pending documents found.
+            <Alert variant="warning">
+              No pending documents found for {filterMonth || "the selected month"}. Please select a different month.
             </Alert>
           ) : (
             <Table striped bordered hover responsive>
@@ -145,4 +158,4 @@ const DocumentStatus = () => {
   );
 };
 
-export default DocumentStatus; 
+export default DocumentStatus;

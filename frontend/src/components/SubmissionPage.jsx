@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { selectToken } from '../redux/authSlice';
 import { documentsAPI } from '../api';
 import CommunicationDateInput, { DatePickerProvider } from './common/CommunicationDateInput';
-import { getTodayDate } from '../utils/dateUtils';
+import { getTodayDate, getPreviousMonthFormatted } from '../utils/dateUtils';
 
 const SubmissionPage = () => {
   const token = useSelector(selectToken);
@@ -38,6 +38,18 @@ const SubmissionPage = () => {
       // Extract unique months for filtering
       const uniqueMonths = [...new Set(data.map(doc => doc.document_month))];
       setMonths(uniqueMonths);
+      
+      // Get the previous month in the expected format
+      const previousMonth = getPreviousMonthFormatted();
+      
+      // Set the filter to the previous month if it exists in our data
+      if (uniqueMonths.includes(previousMonth)) {
+        setFilterMonth(previousMonth);
+      } else if (uniqueMonths.length > 0) {
+        // If previous month doesn't exist, use the most recent month
+        const sortedMonths = [...uniqueMonths].sort().reverse();
+        setFilterMonth(sortedMonths[0]);
+      }
       
     } catch (err) {
       setError(err.message);
@@ -148,8 +160,8 @@ const SubmissionPage = () => {
       ) : (
         <>
           {filteredDocuments.length === 0 ? (
-            <Alert variant="info">
-              No documents found.
+            <Alert variant="warning">
+              No documents found for {filterMonth || "the selected month"}. Please select a different month.
             </Alert>
           ) : (
             <Table striped bordered hover responsive>
@@ -249,4 +261,4 @@ const SubmissionPage = () => {
   );
 };
 
-export default SubmissionPage; 
+export default SubmissionPage;
