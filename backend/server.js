@@ -84,20 +84,21 @@ const createDocumentsIfFirstOfMonth = async () => {
 };
 
 // Start the server
-app.listen(PORT, async () => {
-    console.log(`✅ Server running on port ${PORT}`);
-    
-    try {
-        // Initialize scheduled tasks (now async)
-        await initializeScheduledTasks();
-        console.log('✅ Scheduler service initialized');
-        
-        // Check if it's the 1st of the month and create documents if needed
-        await createDocumentsIfFirstOfMonth();
-    } catch (error) {
-        console.error('❌ Error in server startup tasks:', error);
-    }
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  
+  try {
+      // Initialize scheduled tasks (now async)
+      await initializeScheduledTasks();
+      console.log('✅ Scheduler service initialized');
+      
+      // Check if it's the 1st of the month and create documents if needed
+      await createDocumentsIfFirstOfMonth();
+  } catch (error) {
+      console.error('❌ Error in server startup tasks:', error);
+  }
 });
+
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
